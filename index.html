@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>法学文献引注转换工具 V28.0 </title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif; }
+        .font-song { font-family: "SimSun", "Songti SC", serif; }
+        .xtu-preview {
+            font-family: "FangSong", "STFangsong", serif;
+            font-size: 14px; 
+            line-height: 1.6; 
+        }
+        .clsci-preview {
+            font-family: "SimSun", "Songti SC", serif;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .editable-output {
+            cursor: text;
+            transition: all 0.2s;
+        }
+        .editable-output:focus {
+            outline: none;
+            border-color: #10b981; 
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+            background-color: #ffffff;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto space-y-6">
+        
+        <!-- 头部 -->
+        <div class="bg-gray-900 p-6 rounded-2xl text-white shadow-xl relative overflow-hidden">
+            <h1 class="text-2xl font-bold flex items-center gap-3 relative z-10">
+                ⚖️ 法学文献引注转换工具 <span class="text-xs bg-green-500 text-white px-2 py-1 rounded-full font-bold">V28.0 </span>
+            </h1>
+            <p class="text-gray-300 text-sm mt-2 relative z-10">
+                仅支持知网GB/T 7714-2015格式引文，有bug请反馈给溺水小刀。
+            </p>
+        </div>
+        <div class="text-sm text-gray-500">
+            <p>使用说明：
+                1. 选择目标格式标准。
+                2. 粘贴待转换的文献列表到左侧文本框。
+                3. 转换结果会自动显示在右侧文本框，您可以直接编辑结果。
+                4. 支持自定义引注格式。
+            </p>
+            <br>
+        <!-- 核心控制区 -->
+        <div class="bg-white p-6 rounded-xl shadow-md border border-slate-200">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-lg font-bold text-slate-700 flex items-center gap-2">
+                        <span class="bg-slate-700 text-white w-6 h-6 rounded-full flex items-center justify-center text-sm">1</span>
+                        选择目标格式标准
+                    </h2>
+                </div>
+                
+                <div class="flex bg-slate-100 p-1 rounded-lg">
+                    <button onclick="changeStyle('clsci')" id="btn-clsci" class="px-4 py-2 rounded-md text-sm font-medium transition-all text-slate-600 hover:bg-white hover:shadow-sm">
+                        中国法学引注格式
+                    </button>
+                    <button onclick="changeStyle('xtu')" id="btn-xtu" class="px-4 py-2 rounded-md text-sm font-medium transition-all text-slate-600 hover:bg-white hover:shadow-sm">
+                        湘大研究生引注格式
+                    </button>
+                    <button onclick="changeStyle('custom')" id="btn-custom" class="px-4 py-2 rounded-md text-sm font-medium transition-all text-slate-600 hover:bg-white hover:shadow-sm">
+                        自定义引注格式 (手动编辑)
+                    </button>
+                </div>
+            </div>
+
+            <!-- 类型选择器 (仅自定义模式可见) -->
+            <div id="type-selector-box" class="hidden mt-6 bg-gray-50 border border-gray-200 rounded-lg p-4 transition-all">
+                <div class="flex flex-col md:flex-row gap-6">
+                    <div class="w-full md:w-1/3">
+                        <h3 class="text-sm font-bold text-gray-900 mb-3">A. 选择要处理的文献类型 (强制)：</h3>
+                        <div class="flex flex-wrap gap-2">
+                            <label class="cursor-pointer block w-full"><input type="radio" name="forcedType" value="J" class="peer sr-only" checked onchange="updateEditor()"><div class="px-3 py-2 rounded border border-gray-300 bg-white text-gray-600 peer-checked:bg-gray-800 peer-checked:text-white font-bold text-sm text-center transition">📄 期刊 [J]</div></label>
+                            <label class="cursor-pointer block w-full"><input type="radio" name="forcedType" value="M" class="peer sr-only" onchange="updateEditor()"><div class="px-3 py-2 rounded border border-gray-300 bg-white text-gray-600 peer-checked:bg-gray-800 peer-checked:text-white font-bold text-sm text-center transition">📘 图书 [M]</div></label>
+                            <label class="cursor-pointer block w-full"><input type="radio" name="forcedType" value="D" class="peer sr-only" onchange="updateEditor()"><div class="px-3 py-2 rounded border border-gray-300 bg-white text-gray-600 peer-checked:bg-gray-800 peer-checked:text-white font-bold text-sm text-center transition">🎓 学位 [D]</div></label>
+                            <label class="cursor-pointer block w-full"><input type="radio" name="forcedType" value="W" class="peer sr-only" onchange="updateEditor()"><div class="px-3 py-2 rounded border border-gray-300 bg-white text-gray-600 peer-checked:bg-gray-800 peer-checked:text-white font-bold text-sm text-center transition">🌐 网络 [W]</div></label>
+                            <label class="cursor-pointer block w-full"><input type="radio" name="forcedType" value="C" class="peer sr-only" onchange="updateEditor()"><div class="px-3 py-2 rounded border border-gray-300 bg-white text-gray-600 peer-checked:bg-gray-800 peer-checked:text-white font-bold text-sm text-center transition">⚖️ 案例 [C]</div></label>
+                            <label class="cursor-pointer block w-full"><input type="radio" name="forcedType" value="N" class="peer sr-only" onchange="updateEditor()"><div class="px-3 py-2 rounded border border-gray-300 bg-white text-gray-600 peer-checked:bg-gray-800 peer-checked:text-white font-bold text-sm text-center transition">📰 报纸 [N]</div></label>
+                            <label class="cursor-pointer block w-full"><input type="radio" name="forcedType" value="E" class="peer sr-only" onchange="updateEditor()"><div class="px-3 py-2 rounded border border-gray-300 bg-white text-gray-600 peer-checked:bg-gray-800 peer-checked:text-white font-bold text-sm text-center transition">🔤 英文 [E]</div></label>
+                        </div>
+                    </div>
+
+                    <div class="flex-1 border-l border-gray-200 pl-6">
+                        <div class="flex justify-between items-center mb-2">
+                            <h3 class="text-sm font-bold text-gray-900">B. 编辑该类型的模板代码：</h3>
+                            <button onclick="resetCustomTemplates()" class="text-xs text-slate-400 hover:text-red-500 underline">恢复默认</button>
+                        </div>
+                        <input type="text" id="current-template-code" class="w-full p-3 border border-gray-300 rounded font-mono text-sm bg-white focus:border-gray-800 focus:ring-1 focus:ring-gray-800 outline-none transition" 
+                        oninput="saveManualTemplate(this.value)">
+                        
+                        <div class="mt-3 flex flex-wrap gap-2 text-[10px] text-slate-500">
+                            <span class="bg-gray-100 px-2 py-1 rounded border border-gray-200 cursor-pointer hover:bg-gray-200" onclick="insertTag('{author}')">{author}作者</span>
+                            <span class="bg-gray-100 px-2 py-1 rounded border border-gray-200 cursor-pointer hover:bg-gray-200" onclick="insertTag('{title}')">{title}标题</span>
+                            <span class="bg-gray-100 px-2 py-1 rounded border border-gray-200 cursor-pointer hover:bg-gray-200" onclick="insertTag('{journal}')">{journal}刊名</span>
+                            <span class="bg-gray-100 px-2 py-1 rounded border border-gray-200 cursor-pointer hover:bg-gray-200" onclick="insertTag('{year}')">{year}年份</span>
+                            <span class="bg-gray-100 px-2 py-1 rounded border border-gray-200 cursor-pointer hover:bg-gray-200" onclick="insertTag('{issue}')">{issue}期数</span>
+                            <span class="bg-gray-100 px-2 py-1 rounded border border-gray-200 cursor-pointer hover:bg-gray-200" onclick="insertTag('{pages}')">{pages}页码</span>
+                            <span class="bg-gray-100 px-2 py-1 rounded border border-gray-200 cursor-pointer hover:bg-gray-200" onclick="insertTag('{doi}')">{doi}DOI</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="preset-preview-box" class="mt-6 bg-slate-50 p-4 rounded-lg border border-slate-200">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">当前规则预览</span>
+                    <span id="style-badge" class="text-xs px-2 py-0.5 rounded bg-slate-200 text-slate-700 font-bold">中国法学</span>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 text-xs font-mono text-slate-600">
+                    <div><span class="text-blue-600 font-bold w-12 inline-block">文章 [J]:</span> <span id="preview-J"></span></div>
+                    <div><span class="text-blue-600 font-bold w-12 inline-block">图书 [M]:</span> <span id="preview-M"></span></div>
+                    <div><span class="text-blue-600 font-bold w-12 inline-block">网络 [W]:</span> <span id="preview-W"></span></div>
+                    <div><span class="text-blue-600 font-bold w-12 inline-block">案例 [C]:</span> <span id="preview-C"></span></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid lg:grid-cols-12 gap-6">
+            
+            <div class="lg:col-span-5 flex flex-col h-full">
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex-1 flex flex-col">
+                    <h2 class="font-bold text-slate-700 mb-2 flex items-center gap-2">
+                        <span class="bg-slate-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-sm">2</span>
+                        批量处理区：粘贴待转换文献（粘贴新文献请另起一行）
+                    </h2>
+                    <textarea id="inputArea" class="w-full flex-1 min-h-[300px] p-4 border border-slate-300 rounded-lg font-mono text-sm bg-slate-50 focus:ring-2 focus:ring-slate-500 focus:border-slate-500 transition leading-relaxed" 
+                    placeholder="测试混合输入：&#10;[1]吴怡霏.成都高新区西园街道纪检监察工委：监督阵地建到巷子里连心桥通到家门口[N].成都日报,2025-12-10(007)." oninput="processBatch()"></textarea>
+                </div>
+            </div>
+
+            <div class="lg:col-span-7 flex flex-col h-full">
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex-1 flex flex-col relative">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="font-bold text-slate-700 flex items-center gap-2">
+                            <span class="bg-green-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-sm">3</span>
+                            转换结果 (可编辑)
+                        </h2>
+                        <div class="flex gap-2">
+                            <span id="font-indicator" class="text-xs font-normal text-slate-400 border border-slate-200 px-2 py-1 rounded pt-1">宋体</span>
+                            <button onclick="copyResult()" class="bg-green-100 hover:bg-green-200 text-green-700 text-xs font-bold px-3 py-1 rounded border border-green-300 transition">
+                                复制结果
+                            </button>
+                        </div>
+                    </div>
+                    <textarea id="outputArea" class="w-full flex-1 min-h-[300px] p-4 border border-green-200 rounded-lg bg-green-50 text-sm text-slate-900 leading-relaxed font-song editable-output focus:ring-2 focus:ring-green-500" 
+                    placeholder="结果将直接显示在这里，您可以直接点击此处进行修改..."></textarea>
+                </div>
+            </div>
+        </div>
+        
+        <div class="text-center">
+            <details class="text-xs text-slate-400 inline-block">
+                <summary class="cursor-pointer hover:text-slate-600">Debug Log</summary>
+                <div id="debugLog" class="mt-2 p-3 bg-slate-800 text-green-400 rounded font-mono whitespace-pre-wrap h-32 w-[90vw] max-w-4xl mx-auto text-left overflow-y-auto">Ready...</div>
+            </details>
+        </div>
+    </div>
+
+    <script>
+        const PRESET_STYLES = {
+            'clsci': {
+                name: '中国法学',
+                cssClass: 'clsci-preview',
+                templates: {
+                    'M': '[{index}]{author}：《{title}》，{publisher}{year}年版，第{pages}页。',
+                    'J': '[{index}]{author}：《{title}》，载《{journal}》{year}年第{issue}期，第{pages}页。',
+                    'W': '[{index}]{author}：《{title}》，载{source}{date_cn_long}，{url}。',
+                    'C': '[{index}]{title}，{source}。',
+                    'D': '[{index}]{author}：《{title}》，{publisher}{year}年学位论文，第{pages}页。',
+                    'N': '[{index}]{author}：《{title}》，载《{source}》{year}年{date_cn}，第{pages}版。',
+                    'E': '[{index}]{author}, {title}, {volume} {journal} {pages} ({year}).'
+                }
+            },
+            'xtu': {
+                name: '湘大研究生',
+                cssClass: 'xtu-preview',
+                templates: {
+                    'J': '[{index}]{author}：《{title}》，《{journal}》{year}年第{issue}期。',
+                    'M': '[{index}]{author}：《{title}》，{publisher}，{year}年，第{pages}页。',
+                    'T': '[{index}]{author}：《{title}》，{translator}，{publisher}，{year}年，第{pages}页。',
+                    'D': '[{index}]{author}：《{title}》，{publisher}，{year}年学位论文。',
+                    'N': '[{index}]{author}：《{title}》，《{source}》{year}年{date_cn}。',
+                    'W': '[{index}]{author}：《{title}》，{source}{year}年{date_cn}，{url}。',
+                    'C': '[{index}]{title}。',
+                    'E': '[{index}]{author}, {title}, {journal}, {year}, {pages}.'
+                }
+            },
+            'custom_default': { 
+                name: '自定义 (手动编辑)',
+                cssClass: 'font-mono',
+                templates: {
+                    'J': '{author}. {title}[J]. {journal}, {year}, {volume}({issue}): {pages}. {doi}',
+                    'M': '{author}. {title}[M]. {publisher}, {year}.',
+                    'W': '{author}. {title}[EB/OL]. {source}, {url}.',
+                    'C': '{title}.',
+                    'E': '{author}. {title}. {journal}, {year}.',
+                    'N': '{author}. {title}[N]. {source}, {year}-{date}.',
+                    'D': '{author}. {title}[D]. {publisher}, {year}.'
+                }
+            }
+        };
+
+        function loadCustomTemplates() {
+            try {
+                const saved = localStorage.getItem('userCustomTemplates');
+                return saved ? JSON.parse(saved) : JSON.parse(JSON.stringify(PRESET_STYLES['custom_default'].templates));
+            } catch (e) {
+                return JSON.parse(JSON.stringify(PRESET_STYLES['custom_default'].templates));
+            }
+        }
+
+        function saveCustomTemplates(templates) {
+            localStorage.setItem('userCustomTemplates', JSON.stringify(templates));
+        }
+
+        let currentStyleKey = 'clsci';
+        let currentTemplates = JSON.parse(JSON.stringify(PRESET_STYLES['clsci'].templates));
+        let userCustomTemplates = loadCustomTemplates();
+        let lastInputLineCount = 0; // 记录上次输入的行数
+
+        function changeStyle(key) {
+            currentStyleKey = key;
+            const customBox = document.getElementById('type-selector-box');
+            const previewBox = document.getElementById('preset-preview-box');
+
+            if (key === 'custom') {
+                currentTemplates = userCustomTemplates;
+                if (customBox) customBox.classList.remove('hidden');
+                if (previewBox) previewBox.classList.add('hidden');
+                updateEditor(); 
+            } else {
+                currentTemplates = JSON.parse(JSON.stringify(PRESET_STYLES[key].templates));
+                if (customBox) customBox.classList.add('hidden');
+                if (previewBox) previewBox.classList.remove('hidden');
+                updatePreview();
+            }
+            
+            ['clsci', 'xtu', 'custom'].forEach(k => {
+                const btn = document.getElementById(`btn-${k}`);
+                if (btn) {
+                    if (k === key) {
+                        btn.classList.add('bg-slate-700', 'text-white', 'shadow-md');
+                        btn.classList.remove('text-slate-600', 'hover:bg-white');
+                    } else {
+                        btn.classList.remove('bg-slate-700', 'text-white', 'shadow-md');
+                        btn.classList.add('text-slate-600', 'hover:bg-white');
+                    }
+                }
+            });
+
+            const fontInd = document.getElementById('font-indicator');
+            if (fontInd) fontInd.innerText = key === 'xtu' ? '仿宋模拟' : '宋体';
+
+            lastInputLineCount = 0; // 重置计数器
+            processBatch(true); // 切换格式时强制刷新
+        }
+
+        function updatePreview() {
+            ['J', 'M', 'W', 'N', 'C'].forEach(type => {
+                const el = document.getElementById(`preview-${type}`);
+                if(el) el.innerText = currentTemplates[type] || '暂无';
+            });
+        }
+
+        function getForcedType() {
+            const radios = document.getElementsByName('forcedType');
+            for (let i = 0; i < radios.length; i++) {
+                if (radios[i].checked) return radios[i].value;
+            }
+            return 'J';
+        }
+
+        function updateEditor() {
+            const type = getForcedType();
+            const templateCodeInput = document.getElementById('current-template-code');
+            templateCodeInput.value = currentTemplates[type] || '';
+            lastInputLineCount = 0;
+            processBatch(true);
+        }
+
+        function saveManualTemplate(val) {
+            const type = getForcedType();
+            userCustomTemplates[type] = val;
+            currentTemplates = userCustomTemplates;
+            saveCustomTemplates(userCustomTemplates);
+            lastInputLineCount = 0;
+            processBatch(true);
+        }
+        
+        function insertTag(tag) {
+            const input = document.getElementById('current-template-code');
+            const start = input.selectionStart;
+            const end = input.selectionEnd;
+            const text = input.value;
+            const before = text.substring(0, start);
+            const after = text.substring(end, text.length);
+            input.value = before + tag + after;
+            input.selectionStart = input.selectionEnd = start + tag.length;
+            input.focus();
+            saveManualTemplate(input.value);
+        }
+
+        function resetCustomTemplates() {
+            if (confirm("确定恢复默认设置？")) {
+                userCustomTemplates = JSON.parse(JSON.stringify(PRESET_STYLES['custom_default'].templates));
+                currentTemplates = userCustomTemplates;
+                saveCustomTemplates(userCustomTemplates);
+                updateEditor();
+                lastInputLineCount = 0;
+                processBatch(true);
+            }
+        }
+
+        function processBatch(forceRefresh = false) {
+            const inputEl = document.getElementById('inputArea');
+            const outputEl = document.getElementById('outputArea');
+            if (!inputEl || !outputEl) return;
+            
+            const rawText = inputEl.value.trim();
+            if (!rawText) {
+                outputEl.value = "";
+                lastInputLineCount = 0;
+                return;
+            }
+
+            const lines = rawText.split('\n').filter(line => line.trim());
+            const currentLineCount = lines.length;
+            
+            // 如果是强制刷新（切换格式等），重新处理所有内容
+            if (forceRefresh) {
+                let output = [];
+                const forcedType = currentStyleKey === 'custom' ? getForcedType() : null;
+                
+                lines.forEach((line, idx) => {
+                    line = line.trim();
+                    if (!line) return;
+
+                    const data = smartParse(line);
+                    const type = forcedType ? forcedType : detectType(data, line);
+                    data.index = idx + 1;
+
+                    let template;
+                    if (forcedType) {
+                        template = currentTemplates[forcedType];
+                    } else {
+                        template = (data.isEnglish && currentTemplates['E']) ? currentTemplates['E'] : (currentTemplates[type] || currentTemplates['J']);
+                    }
+
+                    let formatted = fillTemplate(template, data);
+                    output.push(formatted);
+                });
+
+                outputEl.value = output.join('\n');
+                lastInputLineCount = currentLineCount;
+                return;
+            }
+            
+            // 追加模式：只处理新增的行
+            if (currentLineCount > lastInputLineCount) {
+                const newLines = lines.slice(lastInputLineCount);
+                let newOutput = [];
+                const forcedType = currentStyleKey === 'custom' ? getForcedType() : null;
+                
+                // 获取当前输出的行数，用于计算新序号
+                const existingOutputLines = outputEl.value.trim() ? outputEl.value.trim().split('\n') : [];
+                const startIndex = existingOutputLines.length;
+
+                newLines.forEach((line, idx) => {
+                    line = line.trim();
+                    if (!line) return;
+
+                    const data = smartParse(line);
+                    const type = forcedType ? forcedType : detectType(data, line);
+                    data.index = startIndex + idx + 1;
+
+                    let template;
+                    if (forcedType) {
+                        template = currentTemplates[forcedType];
+                    } else {
+                        template = (data.isEnglish && currentTemplates['E']) ? currentTemplates['E'] : (currentTemplates[type] || currentTemplates['J']);
+                    }
+
+                    let formatted = fillTemplate(template, data);
+                    newOutput.push(formatted);
+                });
+
+                // 追加到现有输出
+                if (outputEl.value.trim()) {
+                    outputEl.value = outputEl.value.trim() + '\n' + newOutput.join('\n');
+                } else {
+                    outputEl.value = newOutput.join('\n');
+                }
+                
+                lastInputLineCount = currentLineCount;
+            } else if (currentLineCount < lastInputLineCount) {
+                // 如果行数减少了（用户删除了输入），重新处理
+                processBatch(true);
+            }
+            // 如果行数相同，不做任何处理，保留用户的修改
+        }
+
+        function fillTemplate(tpl, data) {
+            if (!tpl) return "【未定义模板】" + data.title;
+            let res = tpl;
+            
+            res = res.replace(/{author}/g, data.author || "");
+            res = res.replace(/{title}/g, data.title || "");
+            res = res.replace(/{year}/g, data.year || "");
+            res = res.replace(/{journal}/g, data.journal || data.source || "");
+            res = res.replace(/{source}/g, data.source || data.journal || "");
+            res = res.replace(/{publisher}/g, data.publisher || data.source || "");
+            res = res.replace(/{url}/g, data.url || "");
+            res = res.replace(/{issue}/g, data.issue || "");
+            res = res.replace(/{pages}/g, data.pages || "");
+            res = res.replace(/{index}/g, data.index);
+            res = res.replace(/{volume}/g, data.volume || "");
+            res = res.replace(/{date}/g, data.date || "");
+            res = res.replace(/{date_cn}/g, data.date_cn || "");
+            res = res.replace(/{date_cn_long}/g, data.date_cn_long || "");
+            res = res.replace(/{doi}/g, data.doi || "");
+
+            if(!data.author) res = res.replace(/：/, "").replace(/\[\d+\]：/, `[${data.index}]`);
+            
+            // 修复：报纸版次去前导零，例如 第007版 -> 第7版
+            if (data.pages && /^\d+$/.test(data.pages)) {
+                const pageNum = parseInt(data.pages, 10);
+                if (!isNaN(pageNum)) {
+                    res = res.replace(`第${data.pages}版`, `第${pageNum}版`);
+                }
+            } else {
+                if(!data.pages) res = res.replace(/第页/, "").replace(/第\s*页/, "");
+            }
+
+            if(!data.issue) res = res.replace(/第期/, "");
+            if(!data.volume) res = res.replace(/,  /, ", ").trim();
+            
+            if(!data.isEnglish) {
+                res = res.replace(/，，/g, "，").replace(/。。/g, "。").replace(/，。/g, "。");
+                res = res.replace(/\(\)/g, "").replace(/（）/g, "");
+            } else {
+                res = res.replace(/, ,/g, ",");
+            }
+            
+            // 清洗：防止报纸名后有多余标点
+            res = res.replace(/《([^》]+)[、，,]\s*》/g, "《$1》");
+
+            return res;
+        }
+
+        function smartParse(text) {
+            let info = { 
+                author: "", title: "", year: "", source: "", journal: "", publisher: "", 
+                translator: "", volume: "", issue: "", pages: "", 
+                date: "", date_cn: "", date_cn_long: "", url: "", doi: "", isEnglish: false 
+            };
+            
+            text = text.trim().replace(/^\[\d+\]/, "").replace(/^\d+\./, "").trim();
+            
+            const engChars = (text.match(/[a-zA-Z]/g) || []).length;
+            info.isEnglish = engChars > text.length * 0.3;
+            
+            let rawOriginal = text;
+            let safeText = text.replace(/[。，：]/g, c => ({'。':'.','，':',','：':':'})[c]).replace(/[（）]/g, c => ({'（':'(','）':')'})[c]);
+            
+            // 1. DOI / URL
+            const doiMatch = safeText.match(/(https?:\/\/doi\.org\/[\w\.\/\-]+)/);
+            if (doiMatch) {
+                info.doi = doiMatch[1];
+                info.url = doiMatch[1];
+                safeText = safeText.replace(doiMatch[1], "");
+            } else {
+                const urlMatch = safeText.match(/(https?:\/\/[^\s,，。]+)/);
+                if (urlMatch) {
+                    info.url = urlMatch[1];
+                    safeText = safeText.replace(info.url, "");
+                }
+            }
+
+            // 2. 年份 & 日期
+            const bracketDateMatch = safeText.match(/\[(\d{4}[\.\-\/]\d{1,2}[\.\-\/]\d{1,2})\]/);
+            let fullDateStr = "";
+            
+            if (bracketDateMatch) {
+                fullDateStr = bracketDateMatch[1];
+                safeText = safeText.replace(bracketDateMatch[0], ""); 
+            } else {
+                const dateMatchLong = safeText.match(/(\d{4}[\.\-\/年]\d{1,2}[\.\-\/月]\d{1,2}[日]?)/);
+                if (dateMatchLong && dateMatchLong[0].length > 4) { 
+                    fullDateStr = dateMatchLong[0];
+                    safeText = safeText.replace(fullDateStr, "");
+                }
+            }
+
+            if (fullDateStr) {
+                info.date = fullDateStr;
+                let d = fullDateStr.replace(/[年\.\/]/g, '-').replace(/月/g, '-').replace(/日/g, '');
+                let parts = d.split('-');
+                if (parts.length >= 3) {
+                    let y = parseInt(parts[0]);
+                    let m = parseInt(parts[1]);
+                    let day = parseInt(parts[2]);
+                    info.year = y.toString();
+                    info.date_cn = `${m}月${day}日`;
+                    info.date_cn_long = `${y}年${m}月${day}日`;
+                }
+            } else {
+                const yearMatch = safeText.match(/(?:^|[\D])([12]\d{3})(?:[\D]|$)/);
+                if (yearMatch) info.year = yearMatch[1];
+            }
+
+            // 3. 卷号 & 期号
+            const volIssueMatch = safeText.match(/(\d+)\(0?(\d+)\)/); 
+            const issueOnlyMatch = safeText.match(/\(0?(\d+)\)/) || safeText.match(/第(\d+)期/);
+
+            if (volIssueMatch) {
+                if (volIssueMatch[1] === info.year) {
+                    info.issue = volIssueMatch[2]; 
+                } else {
+                    info.volume = volIssueMatch[1]; 
+                    info.issue = volIssueMatch[2]; 
+                }
+            } else if (issueOnlyMatch) {
+                if (/^\d+$/.test(issueOnlyMatch[1])) info.issue = issueOnlyMatch[1];
+            }
+
+            // 4. 页码
+            const pageMatch = safeText.match(/(\d+[-\uff0d]\d+(?:[+,，]\d+)*)/) || safeText.match(/p\.?(\d+)/i) || safeText.match(/第(\d+)页/);
+            
+            if (pageMatch) {
+                if (!/^20\d\d$/.test(pageMatch[1])) {
+                    let rawPages = pageMatch[1];
+                    if (rawPages.includes('+')) {
+                        rawPages = rawPages.split('+')[0];
+                    }
+                    info.pages = rawPages;
+                    info._rawPageString = pageMatch[1];
+                }
+            }
+            
+            // *** V28 修复：更宽容的版次捕获，支持结尾有标点 ***
+            if (!info.pages) {
+                // 尝试捕获 (007) 或 (007).
+                const bracketPage = safeText.match(/\((\d+)\)[\.。]?$/); 
+                if (bracketPage) {
+                    info.pages = bracketPage[1];
+                    info._rawPageString = bracketPage[0];
+                }
+            }
+
+            // 5. 分割
+            if (info.isEnglish) {
+                const parts = rawOriginal.split(/[\.,]\s/);
+                if (parts.length > 0) info.author = parts[0];
+                if (parts.length > 1) info.title = parts[1];
+                if (parts.length > 2 && !parts[2].match(/^\d/)) info.journal = parts[2];
+                info.source = info.journal;
+                return info;
+            }
+
+            if (rawOriginal.includes("案")) {
+                const anIndex = rawOriginal.indexOf("案，");
+                if (anIndex > -1) {
+                    info.title = rawOriginal.substring(0, anIndex + 1);
+                    info.source = rawOriginal.substring(anIndex + 2).replace(/。$/, "");
+                    return info; 
+                }
+            }
+
+            let cleanText = safeText.replace(/\[[A-Z\/]+\]/g, "");
+            cleanText = cleanText.replace(/([^\d]),([^\d])/g, "$1、$2"); 
+            
+            let parts = cleanText.split('.').map(p => p.trim()).filter(p => p);
+
+            if (rawOriginal.startsWith("《") || rawOriginal.startsWith("“")) {
+                info.author = ""; 
+                const titleEnd = Math.max(rawOriginal.indexOf("》"), rawOriginal.indexOf("”"));
+                if (titleEnd > -1) {
+                    if (parts.length > 1 && parts[0].length < 15) {
+                         info.author = parts[0];
+                         info.title = parts[1];
+                    } else {
+                         info.title = rawOriginal.substring(0, titleEnd+1); 
+                    }
+                } else {
+                    info.title = parts[0];
+                }
+            } else {
+                if (parts.length >= 1) info.author = parts[0];
+                if (parts.length >= 2) info.title = parts[1];
+            }
+
+            if (!info.source && parts.length > 2) {
+                 let potentialSources = parts.slice(2).filter(p => p.length > 1 && !p.includes("译") && !p.match(/^[\d\s-]+$/));
+                 if (potentialSources.length > 0) info.source = potentialSources[0];
+            }
+
+            // 6. 深度清洗来源
+            if (info.source) {
+                let s = info.source;
+                if (fullDateStr) s = s.replace(fullDateStr, "");
+                if (info.year) s = s.replace(info.year, "");
+                
+                if (info.volume && info.issue) {
+                    const regex = new RegExp(`${info.volume}\\(0?${info.issue}\\)`);
+                    s = s.replace(regex, "");
+                }
+                if (info.issue) {
+                    s = s.replace(new RegExp(`\\(0?${info.issue}\\)`), "").replace(new RegExp(`第${info.issue}期`), "");
+                }
+                if (info._rawPageString) {
+                    const escapedPages = info._rawPageString.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    s = s.replace(new RegExp(escapedPages), "");
+                }
+                
+                s = s.replace(/^[:：,，\-\/\s]+|[:：,，\-\/\s]+$/g, "").trim();
+                s = s.replace(/-\d+-/g, ""); 
+                s = s.replace(/\/\d+\//g, "");
+                if (s === "、" || s === "," || s === "，") s = "";
+
+                info.source = s;
+                if (s.includes("出版社") || s.includes("Press")) info.publisher = s;
+                else info.journal = s;
+            }
+
+            return info;
+        }
+
+        function detectType(data, rawLine) {
+            if (data.isEnglish) return 'E'; 
+            if (rawLine.includes('[J]')) return 'J';
+            if (rawLine.includes('[M]')) return 'M';
+            if (rawLine.includes('[D]')) return 'D';
+            if (rawLine.includes('[N]')) return 'N';
+            if (rawLine.includes('[W]')) return 'W';
+            if (rawLine.includes("案")) return 'C';
+            if (data.url || data.doi) return 'W'; 
+            if (rawLine.includes('J/OL')) return 'J';
+            
+            if (data.source && data.source.includes("出版社")) return 'M';
+            return 'J';
+        }
+
+        function copyResult() {
+            document.getElementById('outputArea').select();
+            document.execCommand('copy');
+            alert("已复制！");
+        }
+
+        function log(msg) {
+            const logEl = document.getElementById('debugLog');
+            if (logEl) logEl.innerText = `${msg}\n` + logEl.innerText;
+        }
+
+        window.onload = function() {
+            changeStyle('clsci');
+        }
+    </script>
+</body>
+</html>
