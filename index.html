@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>法学文献引注转换工具 V28.0 </title>
+    <title>法学文献引注转换工具 V29.0 </title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif; }
@@ -37,7 +37,7 @@
         <!-- 头部 -->
         <div class="bg-gray-900 p-6 rounded-2xl text-white shadow-xl relative overflow-hidden">
             <h1 class="text-2xl font-bold flex items-center gap-3 relative z-10">
-                ⚖️ 法学文献引注转换工具 <span class="text-xs bg-green-500 text-white px-2 py-1 rounded-full font-bold">V28.0 </span>
+                ⚖️ 法学文献引注转换工具 <span class="text-xs bg-green-500 text-white px-2 py-1 rounded-full font-bold">V29.0 </span>
             </h1>
             <p class="text-gray-300 text-sm mt-2 relative z-10">
                 仅支持知网GB/T 7714-2015格式引文，有bug请反馈给溺水小刀。
@@ -226,7 +226,7 @@
         let currentStyleKey = 'clsci';
         let currentTemplates = JSON.parse(JSON.stringify(PRESET_STYLES['clsci'].templates));
         let userCustomTemplates = loadCustomTemplates();
-        let lastInputLineCount = 0; // 记录上次输入的行数
+        let lastInputLines = []; // 记录上次输入的每一行内容
 
         function changeStyle(key) {
             currentStyleKey = key;
@@ -261,7 +261,7 @@
             const fontInd = document.getElementById('font-indicator');
             if (fontInd) fontInd.innerText = key === 'xtu' ? '仿宋模拟' : '宋体';
 
-            lastInputLineCount = 0; // 重置计数器
+            lastInputLines = []; // 重置记录
             processBatch(true); // 切换格式时强制刷新
         }
 
@@ -284,7 +284,7 @@
             const type = getForcedType();
             const templateCodeInput = document.getElementById('current-template-code');
             templateCodeInput.value = currentTemplates[type] || '';
-            lastInputLineCount = 0;
+            lastInputLines = [];
             processBatch(true);
         }
 
@@ -293,7 +293,7 @@
             userCustomTemplates[type] = val;
             currentTemplates = userCustomTemplates;
             saveCustomTemplates(userCustomTemplates);
-            lastInputLineCount = 0;
+            lastInputLines = [];
             processBatch(true);
         }
         
@@ -316,7 +316,7 @@
                 currentTemplates = userCustomTemplates;
                 saveCustomTemplates(userCustomTemplates);
                 updateEditor();
-                lastInputLineCount = 0;
+                lastInputLines = [];
                 processBatch(true);
             }
         }
@@ -329,12 +329,15 @@
             const rawText = inputEl.value.trim();
             if (!rawText) {
                 outputEl.value = "";
-                lastInputLineCount = 0;
+                lastInputLines = [];
                 return;
             }
 
-            const lines = rawText.split('\n').filter(line => line.trim());
+            const lines = rawText.split('\n').filter(line => line.trim()).map(line => line.trim());
             const currentLineCount = lines.length;
+            
+            // 获取当前输出的行
+            const outputLines = outputEl.value.trim() ? outputEl.value.trim().split('\n') : [];
             
             // 如果是强制刷新（切换格式等），重新处理所有内容
             if (forceRefresh) {
@@ -342,7 +345,6 @@
                 const forcedType = currentStyleKey === 'custom' ? getForcedType() : null;
                 
                 lines.forEach((line, idx) => {
-                    line = line.trim();
                     if (!line) return;
 
                     const data = smartParse(line);
@@ -361,27 +363,26 @@
                 });
 
                 outputEl.value = output.join('\n');
-                lastInputLineCount = currentLineCount;
+                lastInputLines = [...lines];
                 return;
             }
             
-            // 追加模式：只处理新增的行
-            if (currentLineCount > lastInputLineCount) {
-                const newLines = lines.slice(lastInputLineCount);
-                let newOutput = [];
-                const forcedType = currentStyleKey === 'custom' ? getForcedType() : null;
+            // 智能更新模式：检测哪些行发生了变化
+            let newOutputLines = [...outputLines];
+            let needUpdate = false;
+            const forcedType = currentStyleKey === 'custom' ? getForcedType() : null;
+            
+            // 检查每一行是否有变化
+            for (let i = 0; i < currentLineCount; i++) {
+                const currentLine = lines[i];
+                const previousLine = lastInputLines[i] || '';
                 
-                // 获取当前输出的行数，用于计算新序号
-                const existingOutputLines = outputEl.value.trim() ? outputEl.value.trim().split('\n') : [];
-                const startIndex = existingOutputLines.length;
-
-                newLines.forEach((line, idx) => {
-                    line = line.trim();
-                    if (!line) return;
-
-                    const data = smartParse(line);
-                    const type = forcedType ? forcedType : detectType(data, line);
-                    data.index = startIndex + idx + 1;
+                // 如果这是新增的行，或者内容发生了变化
+                if (i >= lastInputLines.length || currentLine !== previousLine) {
+                    needUpdate = true;
+                    const data = smartParse(currentLine);
+                    const type = forcedType ? forcedType : detectType(data, currentLine);
+                    data.index = i + 1;
 
                     let template;
                     if (forcedType) {
@@ -391,22 +392,21 @@
                     }
 
                     let formatted = fillTemplate(template, data);
-                    newOutput.push(formatted);
-                });
-
-                // 追加到现有输出
-                if (outputEl.value.trim()) {
-                    outputEl.value = outputEl.value.trim() + '\n' + newOutput.join('\n');
-                } else {
-                    outputEl.value = newOutput.join('\n');
+                    newOutputLines[i] = formatted;
                 }
-                
-                lastInputLineCount = currentLineCount;
-            } else if (currentLineCount < lastInputLineCount) {
-                // 如果行数减少了（用户删除了输入），重新处理
-                processBatch(true);
             }
-            // 如果行数相同，不做任何处理，保留用户的修改
+            
+            // 如果行数减少了，截断输出
+            if (currentLineCount < lastInputLines.length) {
+                newOutputLines = newOutputLines.slice(0, currentLineCount);
+                needUpdate = true;
+            }
+            
+            if (needUpdate) {
+                outputEl.value = newOutputLines.join('\n');
+            }
+            
+            lastInputLines = [...lines];
         }
 
         function fillTemplate(tpl, data) {
@@ -637,14 +637,15 @@
 
         function detectType(data, rawLine) {
             if (data.isEnglish) return 'E'; 
-            if (rawLine.includes('[J]')) return 'J';
+            // J/OL 优先识别为期刊（网络首发的期刊文章）
+            if (rawLine.includes('[J/OL]') || rawLine.includes('[J]')) return 'J';
             if (rawLine.includes('[M]')) return 'M';
             if (rawLine.includes('[D]')) return 'D';
             if (rawLine.includes('[N]')) return 'N';
-            if (rawLine.includes('[W]')) return 'W';
+            if (rawLine.includes('[W]') || rawLine.includes('[EB/OL]')) return 'W';
             if (rawLine.includes("案")) return 'C';
-            if (data.url || data.doi) return 'W'; 
-            if (rawLine.includes('J/OL')) return 'J';
+            // 只有明确的网络文献才识别为 W，带 DOI 的期刊不算
+            if (data.url && !data.doi) return 'W'; 
             
             if (data.source && data.source.includes("出版社")) return 'M';
             return 'J';
